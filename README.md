@@ -1,10 +1,10 @@
 # Node Proxy
 
-This repository contains the Node Proxy source code written in C++.  There are two internal libraries: [libmicrohttpd2](https://github.com/metahashorg/libmicrohttpd2) and [libmhsupport](https://github.com/metahashorg/libmhsupport) used in this code. 
+This repository contains the Proxy Node source code written in C++. There are two internal libraries: [libmicrohttpd2](https://github.com/metahashorg/libmicrohttpd2) and [libmhsupport](https://github.com/metahashorg/libmhsupport) used in this code. 
 
 ## Build
 
-Please follow these steps to build and run Proxy on Ubuntu successfully:
+Please follow these steps to build and run Proxy on Ubuntu 14.04 x64 successfully:
 ```shell
 cmake > 3.8
     gcc > 8.0
