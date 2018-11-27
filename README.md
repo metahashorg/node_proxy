@@ -1,4 +1,4 @@
-# Node Proxy
+# MetaHash network Proxy
 
 This repository contains the Proxy Node source code written in C++. There are two internal libraries: [libmicrohttpd2](https://github.com/metahashorg/libmicrohttpd2) and [libmhsupport](https://github.com/metahashorg/libmhsupport) used in this code. 
 
