@@ -67,3 +67,5 @@ git clone https://github.com/metahashorg/node_proxy
 cd proxy_prep/build
 ./build.sh
 ```
+
+You are also welcome to download a compiled executable for ubuntu 14/16/18 in repository releases.
