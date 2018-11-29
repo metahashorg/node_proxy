@@ -41,6 +41,8 @@ make
 make install
 ```
 4. Get and compile libmicrohttpd2
+
+Please note: you must use this libmicrohttpd2 library, because the original libmicrohttpd library has no all functions available which are necessary for running Proxy.
 ```shell
 cd /tmp
 git clone https://github.com/metahashorg/libmicrohttpd2
