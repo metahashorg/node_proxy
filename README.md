@@ -64,6 +64,7 @@ sudo make install
 ```
 6. Build Proxy Node
 ```shell
+cd /tmp
 git clone https://github.com/metahashorg/node_proxy
 cd node_proxy/build
 ./build.sh
