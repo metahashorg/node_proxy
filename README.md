@@ -57,8 +57,6 @@ make install
 cd /tmp
 git clone https://github.com/metahashorg/libmhsupport
 cd libmhsupport/build
-mkdir build
-cd build
 cmake -DCMAKE_INSTALL_PREFIX=`readlink -f $INSTALL` -DCMAKE_BUILD_TYPE=Release  ..
 make --jobs=`nproc`
 make install
@@ -66,7 +64,7 @@ make install
 6. Build Proxy Node
 ```shell
 git clone https://github.com/metahashorg/node_proxy
-cd proxy_prep/build
+cd node_proxy/build
 ./build.sh
 ```
 
