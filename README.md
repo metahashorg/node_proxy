@@ -14,13 +14,13 @@ libevent 2.1.8
 Please follow these steps to build and run Proxy on Ubuntu 14.04 x64:
 1. Preparation
 ```shell
-add-apt-repository ppa:ubuntu-toolchain-r/test
-apt update
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt update
 
-apt install gcc-8 g++-8 liburiparser-dev libssl-dev libevent-dev git libevent-2.0-5 automake libtool texinfo make
+sudo apt install gcc-8 g++-8 liburiparser-dev libssl-dev libevent-dev git libevent-2.0-5 automake libtool texinfo make
     
-update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-8
-update-alternatives --config gcc
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+sudo update-alternatives --config gcc
 ```
 2. Get and compile latest cmake
 ```shell
