@@ -19,7 +19,7 @@ Please follow these steps to build and run Proxy on Ubuntu 14.04 x64:
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 sudo apt update
 
-sudo apt install gcc-8 g++-8 liburiparser-dev libssl-dev libevent-dev git libevent-2.0-5 automake libtool texinfo make
+sudo apt install gcc-8 g++-8 liburiparser-dev libssl-dev libevent-dev git automake libtool texinfo make
     
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-8
 sudo update-alternatives --config gcc
@@ -28,6 +28,7 @@ sudo update-alternatives --config gcc
 ```shell
 cd /tmp
 wget https://github.com/Kitware/CMake/releases/download/v3.13.0/cmake-3.13.0.tar.gz
+tar zxfv cmake-3.13.0.tar.gz
 cd cmake-3.13.0
 ./bootstrap
 ./configure
