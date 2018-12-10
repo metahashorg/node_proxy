@@ -77,7 +77,7 @@ cd node_proxy/build
 
 1. Stop running proxy:
 ```shell
-kill `ps axuwf|grep proxy_config|grep -v grep|awk '{print $2}'
+kill `ps axuwf|grep proxy_config|grep -v grep|awk '{print $2}'`
 ```
 2. Go to directory where you've cloned node_proxy, for example
 
