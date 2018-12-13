@@ -94,3 +94,18 @@ make -j
 ```shell
 ./proxy proxy_key proxy_config 9999 1000000
 ```
+
+## Script for starting, stopping, restarting.
+Script [proxy.sh](https://github.com/metahashorg/node_proxy/blob/master/proxy.sh) for the following operations with Metahash proxy application:
+* starting, 
+* stopping, 
+* restarting,
+* getting status.
+
+Note: default workdir is /opt/proxy. If you’ve install proxy to another location please change workdir in script.
+
+### Usage
+RUN script as follows:
+```shell
+./proxy.sh status
+```
