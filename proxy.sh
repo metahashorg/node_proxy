@@ -5,7 +5,7 @@ port=9999
 num=1000000
 log=proxy.log
 key=proxy_key
-conf=proxy.conf
+conf=proxy_config
 
 function startProxy() {
 
