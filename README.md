@@ -104,7 +104,7 @@ Script [proxy.sh](https://github.com/metahashorg/node_proxy/blob/master/proxy.sh
 
 Note: default workdir is /opt/proxy. If you’ve install proxy to another location please change workdir in script.
 
-### Usage
+#### Usage script
 RUN script as follows:
 ```shell
 ./proxy.sh status
