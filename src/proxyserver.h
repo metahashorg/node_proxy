@@ -7,7 +7,7 @@
 
 
 const uint VESION_MAJOR = 1;
-const uint VESION_MINOR = 0;
+const uint VESION_MINOR = 3;
 
 
 struct KeyManager
