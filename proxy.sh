@@ -51,6 +51,7 @@ function stopProxy() {
 
         echo Stopping proxy, pid $pid
         kill $pid
+        sleep 2
         status
 
         if [ $res -eq 0 ]
