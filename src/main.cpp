@@ -1,52 +1,51 @@
 
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-#include <unistd.h>
-#include <netdb.h>
 #include <limits.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <signal.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include <string.h>
 
-#include <string>
-#include <thread>
+#include <fstream>
 #include <iostream>
 #include <sstream>
-#include <fstream>
+#include <string>
+#include <thread>
 
 #include <mh/libevent/LibEvent.h>
 
+#include "concurrentqueue.h"
 #include "proxyserver.h"
 #include "transaction.h"
-#include "concurrentqueue.h"
 
-
-std::string getMyIp() {
+std::string getMyIp()
+{
     std::string MyIP;
     const char* statistics_server = "172.104.236.166";
     int statistics_port = 5797;
 
     struct sockaddr_in serv;
 
-    int sock = socket ( AF_INET, SOCK_STREAM, 0);
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
 
     //Socket could not be created
-    if (sock < 0)
-    {
+    if (sock < 0) {
         perror("Socket error");
     }
 
-    memset( &serv, 0, sizeof(serv) );
+    memset(&serv, 0, sizeof(serv));
     serv.sin_family = AF_INET;
-    serv.sin_addr.s_addr = inet_addr( statistics_server );
-    serv.sin_port = htons( statistics_port );
+    serv.sin_addr.s_addr = inet_addr(statistics_server);
+    serv.sin_port = htons(statistics_port);
 
-    connect( sock , (const struct sockaddr*) &serv , sizeof(serv) );
+    connect(sock, (const struct sockaddr*)&serv, sizeof(serv));
 
     struct sockaddr_in name;
     socklen_t namelen = sizeof(name);
-    getsockname(sock, (struct sockaddr*) &name, &namelen);
+    getsockname(sock, (struct sockaddr*)&name, &namelen);
 
     char buffer[100];
     const char* p = inet_ntop(AF_INET, &name.sin_addr, buffer, 100);
@@ -63,15 +62,15 @@ std::string getMyIp() {
     return MyIP;
 }
 
-
-std::string getHostName() {
+std::string getHostName()
+{
     char hostname[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
     return std::string(hostname);
 }
 
-
-bool check_addr(const std::string & addr) {
+bool check_addr(const std::string& addr)
+{
     if (addr[0] == '0' && addr[1] == 'x') {
         for (uint i = 2; i < addr.length(); i++) {
             if (!isxdigit(addr[i])) {
@@ -85,23 +84,30 @@ bool check_addr(const std::string & addr) {
     return true;
 }
 
-
-void libevent(moodycamel::ConcurrentQueue<TX *> & send_message, std::string host, int port, KeyManager & key_holder) {
+void libevent(moodycamel::ConcurrentQueue<TX*>& send_message, std::string host, int port, KeyManager& key_holder)
+{
     mh::libevent::LibEvent levent;
     std::string req_post;
-    while(true) {
-        TX * p_req_post;
+    while (true) {
+        TX* p_req_post;
         if (send_message.try_dequeue(p_req_post)) {
             req_post.insert(req_post.end(), p_req_post->raw_tx.begin(), p_req_post->raw_tx.end());
             std::string path = key_holder.make_req_url(req_post);
 
             std::string response;
-            while (true) {
+            uint i = 0;
+            for (; i < 100; i++) {
                 int status = levent.post_keep_alive(host, port, host, path, req_post, response, 500);
-                if (status > 0) break;
+                if (status > 0)
+                    break;
             }
 
-            delete p_req_post;
+            if (i >= 100) {
+                send_message.enqueue(p_req_post);
+            } else {
+                delete p_req_post;
+            }
+
             req_post.clear();
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -109,24 +115,27 @@ void libevent(moodycamel::ConcurrentQueue<TX *> & send_message, std::string host
     }
 }
 
-void SIGPIPE_handler(int s) {
+void SIGPIPE_handler(int s)
+{
     printf("Caught SIGPIPE(%d)\n", s);
 }
 
-int main (int argc, char** argv) {
-    moodycamel::ConcurrentQueue<TX *> send_message_queue;
+int main(int argc, char** argv)
+{
+    moodycamel::ConcurrentQueue<TX*> send_message_queue;
 
     std::cout << "Version:\t" << VESION_MAJOR << "." << VESION_MINOR << "." << std::endl;
 
     int listen_port = 0;
     int pool_size = 0;
+    std::string network;
     KeyManager key_holder;
     std::vector<std::thread> sender;
 
     if (argc > 4) {
         {
             std::ifstream file(argv[1]);
-            std::string   line;
+            std::string line;
 
             if (std::getline(file, line)) {
                 if (!key_holder.parse(line)) {
@@ -144,17 +153,34 @@ int main (int argc, char** argv) {
 
         {
             std::ifstream file(argv[2]);
-            std::string   line;
+            std::string line;
+            bool first_line = true;
 
-            while(std::getline(file, line)) {
-                std::stringstream   linestream(line);
-                std::string         host;
-                int                 port;
-                int                 conn;
+            while (std::getline(file, line)) {
+                std::stringstream linestream(line);
+                std::string host;
+                int port = 0;
+                int conn = 0;
 
                 linestream >> host >> port >> conn;
                 std::cout << "Conn\t" << host << "\t" << port << "\t" << conn << "\n";
-                for (int i = 0 ; i < conn; i++) {
+
+                if (first_line) {
+                    if (port == 0 && conn == 0) {
+                        std::stringstream netwok_line(line);
+                        netwok_line >> network;
+                        std::cout << "network\t" << network << std::endl;
+                        first_line = false;
+                        continue;
+                    } else {
+                        std::cerr << "seems to be old config" << std::endl;
+                        std::cerr << "first line must be network" << std::endl;
+                        std::cerr << "check documentation" << std::endl;
+                        exit(1);
+                    }
+                }
+
+                for (int i = 0; i < conn; i++) {
                     sender.push_back(std::thread(libevent, std::ref(send_message_queue), host, port, std::ref(key_holder)));
                 }
             }
@@ -172,8 +198,13 @@ int main (int argc, char** argv) {
         exit(1);
     }
 
+    if (sender.size() == 0 || network.empty()) {
+        std::cerr << "Ivalid configuration file" << std::endl;
+        exit(1);
+    }
+
     Counters counters;
-    std::thread trd([&counters, &send_message_queue, &key_holder](){
+    std::thread trd([&counters, &send_message_queue, &key_holder, network]() {
         mh::libevent::LibEvent levent;
         char printbuf[100000];
         while (true) {
@@ -184,36 +215,36 @@ int main (int argc, char** argv) {
             uint64_t timestamp = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now()).time_since_epoch().count();
             memset(printbuf, 0, 100000);
             snprintf(
-                        printbuf,
-                        100000,
-                        "{\"params\": \n"
-                        "   {\"network\":\"net-dev\", \"group\": \"proxy\", \"server\": \"%s\", \"timestamp_ms\": %ld,\n"
-                        "   \"metrics\": [\n"
-                        "        {\"metric\": \"qps\", \"type\": \"sum\", \"value\": %ld},\n"
-                        "        {\"metric\": \"qps_trash\", \"type\": \"sum\", \"value\": %ld},\n"
-                        "        {\"metric\": \"qps_no_req\", \"type\": \"sum\", \"value\": %ld},\n"
-                        "        {\"metric\": \"qps_inv\", \"type\": \"sum\", \"value\": %ld},\n"
-                        "        {\"metric\": \"qps_inv_sign\", \"type\": \"sum\", \"value\": %ld},\n"
-                        "        {\"metric\": \"qps_success\", \"type\": \"sum\", \"value\": %ld},\n"
-                        "        {\"metric\": \"queue\", \"type\": \"sum\", \"value\": %ld},\n"
-                        "        {\"metric\": \"ip\", \"type\": \"none\", \"value\": \"%s\"},\n"
-                        "        {\"metric\": \"mh_addr\", \"type\": \"none\", \"value\": \"%s\"},\n"
-                        "        {\"metric\": \"version\", \"type\": \"none\", \"value\": \"%d.%d\"}\n"
-                        "    ]},\n"
-                        "\"id\": 1}",
-                        host.c_str(), timestamp,
-                        counters.qps.load(),
-                        counters.qps_trash.load(),
-                        counters.qps_no_req.load(),
-                        counters.qps_inv.load(),
-                        counters.qps_inv_sign.load(),
-                        counters.qps_success.load(),
-                        send_message_queue.size_approx(),
-                        ip.c_str(),
-                        key_holder.Text_addres.c_str(),
-                        VESION_MAJOR,
-                        VESION_MINOR
-                        );
+                printbuf,
+                100000,
+                "{\"params\": \n"
+                "   {\"network\":\"%s\", \"group\": \"proxy\", \"server\": \"%s\", \"timestamp_ms\": %ld,\n"
+                "   \"metrics\": [\n"
+                "        {\"metric\": \"qps\", \"type\": \"sum\", \"value\": %ld},\n"
+                "        {\"metric\": \"qps_trash\", \"type\": \"sum\", \"value\": %ld},\n"
+                "        {\"metric\": \"qps_no_req\", \"type\": \"sum\", \"value\": %ld},\n"
+                "        {\"metric\": \"qps_inv\", \"type\": \"sum\", \"value\": %ld},\n"
+                "        {\"metric\": \"qps_inv_sign\", \"type\": \"sum\", \"value\": %ld},\n"
+                "        {\"metric\": \"qps_success\", \"type\": \"sum\", \"value\": %ld},\n"
+                "        {\"metric\": \"queue\", \"type\": \"sum\", \"value\": %ld},\n"
+                "        {\"metric\": \"ip\", \"type\": \"none\", \"value\": \"%s\"},\n"
+                "        {\"metric\": \"mh_addr\", \"type\": \"none\", \"value\": \"%s\"},\n"
+                "        {\"metric\": \"version\", \"type\": \"none\", \"value\": \"%d.%d\"}\n"
+                "    ]},\n"
+                "\"id\": 1}",
+                network.c_str(),
+                host.c_str(), timestamp,
+                counters.qps.load(),
+                counters.qps_trash.load(),
+                counters.qps_no_req.load(),
+                counters.qps_inv.load(),
+                counters.qps_inv_sign.load(),
+                counters.qps_success.load(),
+                send_message_queue.size_approx(),
+                ip.c_str(),
+                key_holder.Text_addres.c_str(),
+                VESION_MAJOR,
+                VESION_MINOR);
 
             std::string req_post(printbuf);
             std::string response;
@@ -228,7 +259,7 @@ int main (int argc, char** argv) {
         }
     });
 
-    PROXY_SERVER PS(listen_port, send_message_queue, pool_size, counters);
+    PROXY_SERVER PS(listen_port, send_message_queue, pool_size, counters, key_holder);
     PS.start();
 
     return 0;

@@ -1,6 +1,6 @@
 #include "proxyserver.h"
-#include "open_ssl_decor.h"
 #include "concurrentqueue.h"
+#include "open_ssl_decor.h"
 #include "rapidjson_new/document.h"
 
 #include <iostream>
@@ -16,24 +16,21 @@ static const char P_DATA[] = "p_data";
 static const char T_CREATE[] = "addWallet";
 static const char T_SEND[] = "send";
 
-
-PROXY_SERVER::PROXY_SERVER(
-        int _port,
-        moodycamel::ConcurrentQueue<TX *> &_send_message_queue,
-        uint64_t _pool_size,
-        Counters &_counter) :
-    mh::mhd::MHD(),
-    send_message_queue(_send_message_queue),
-    pool_size(_pool_size),
-    counters(_counter)
+PROXY_SERVER::PROXY_SERVER(int _port, moodycamel::ConcurrentQueue<TX*>& _send_message_queue, uint64_t _pool_size, Counters& _counter, KeyManager& key_holder)
+    : mh::mhd::MHD()
+    , send_message_queue(_send_message_queue)
+    , pool_size(_pool_size)
+    , counters(_counter)
+    , key_manager(key_holder)
 {
     set_port(_port);
     set_threads(std::thread::hardware_concurrency());
 }
 
-PROXY_SERVER::~PROXY_SERVER() { }
+PROXY_SERVER::~PROXY_SERVER() = default;
 
-bool PROXY_SERVER::run(int thread_number, mh::mhd::MHD::Request &mhd_req, mh::mhd::MHD::Response &mhd_resp) {
+bool PROXY_SERVER::run(int thread_number, mh::mhd::MHD::Request& mhd_req, mh::mhd::MHD::Response& mhd_resp)
+{
     counters.qps++;
 
     mhd_resp.headers["Access-Control-Allow-Origin"] = "*";
@@ -44,29 +41,21 @@ bool PROXY_SERVER::run(int thread_number, mh::mhd::MHD::Request &mhd_req, mh::mh
     }
 
     if (mhd_req.params.find("act") != mhd_req.params.end()) {
-        std::string & act = mhd_req.params["act"];
+        std::string& act = mhd_req.params["act"];
 
         if (act == T_SEND) {
             if (
-                    mhd_req.params.find(P_TO) != mhd_req.params.end() &&
-                    mhd_req.params.find(P_PUBK) != mhd_req.params.end() &&
-                    mhd_req.params.find(P_VALUE) != mhd_req.params.end() &&
-                    mhd_req.params.find(P_SIGN) != mhd_req.params.end() &&
-                    mhd_req.params.find(P_NO) != mhd_req.params.end() &&
-                    mhd_req.params.find(P_FEE) != mhd_req.params.end() &&
-                    mhd_req.params.find(P_DATA) != mhd_req.params.end())
-            {
-                TX * p_tx = new TX;
+                mhd_req.params.find(P_TO) != mhd_req.params.end() && mhd_req.params.find(P_PUBK) != mhd_req.params.end() && mhd_req.params.find(P_VALUE) != mhd_req.params.end() && mhd_req.params.find(P_SIGN) != mhd_req.params.end() && mhd_req.params.find(P_NO) != mhd_req.params.end() && mhd_req.params.find(P_FEE) != mhd_req.params.end() && mhd_req.params.find(P_DATA) != mhd_req.params.end()) {
+                TX* p_tx = new TX;
 
                 if (p_tx->fill_from_strings(
-                            mhd_req.params[P_TO],
-                            mhd_req.params[P_VALUE],
-                            mhd_req.params[P_FEE],
-                            mhd_req.params[P_NO],
-                            mhd_req.params[P_DATA],
-                            mhd_req.params[P_SIGN],
-                            mhd_req.params[P_PUBK]))
-                {
+                        mhd_req.params[P_TO],
+                        mhd_req.params[P_VALUE],
+                        mhd_req.params[P_FEE],
+                        mhd_req.params[P_NO],
+                        mhd_req.params[P_DATA],
+                        mhd_req.params[P_SIGN],
+                        mhd_req.params[P_PUBK])) {
                     std::string tx_hash_hex = bin2hex(p_tx->hash);
                     counters.qps_success++;
                     mhd_resp.data += "Transaction accapted.<BR/>" + tx_hash_hex;
@@ -103,79 +92,71 @@ bool PROXY_SERVER::run(int thread_number, mh::mhd::MHD::Request &mhd_req, mh::mh
             if (req_json.HasMember("method") && req_json["method"].IsString()) {
                 std::cout << mhd_req.post << std::endl;
 
-                if (std::string(req_json["method"].GetString()) == "mhc_send") {
+                bool real_tx = (std::string(req_json["method"].GetString()) == "mhc_send");
+                bool test_tx = (std::string(req_json["method"].GetString()) == "mhc_test_send");
+                if (real_tx || test_tx) {
                     if (req_json.HasMember("params") && req_json["params"].IsObject()) {
-                        if (req_json["params"].HasMember("to") && req_json["params"]["to"].IsString() &&
-                                req_json["params"].HasMember("value") && req_json["params"]["value"].IsString() &&
-                                req_json["params"].HasMember("fee") && req_json["params"]["fee"].IsString() &&
-                                req_json["params"].HasMember("nonce") && req_json["params"]["nonce"].IsString() &&
-                                req_json["params"].HasMember("data") && req_json["params"]["data"].IsString() &&
-                                req_json["params"].HasMember("pubkey") && req_json["params"]["pubkey"].IsString() &&
-                                req_json["params"].HasMember("sign") && req_json["params"]["sign"].IsString()
-                                )
-                        {
+                        if (req_json["params"].HasMember("to") && req_json["params"]["to"].IsString()
+                            && req_json["params"].HasMember("value") && req_json["params"]["value"].IsString()
+                            && req_json["params"].HasMember("fee") && req_json["params"]["fee"].IsString()
+                            && req_json["params"].HasMember("nonce") && req_json["params"]["nonce"].IsString()
+                            && req_json["params"].HasMember("data") && req_json["params"]["data"].IsString()
+                            && req_json["params"].HasMember("pubkey") && req_json["params"]["pubkey"].IsString()
+                            && req_json["params"].HasMember("sign") && req_json["params"]["sign"].IsString()) {
+
                             std::string rto_addr(req_json["params"]["to"].GetString());
                             std::string rdata(req_json["params"]["data"].GetString());
                             std::string rsign(req_json["params"]["sign"].GetString());
                             std::string rpub_key(req_json["params"]["pubkey"].GetString());
 
-                            TX * p_tx = new TX;
+                            TX* p_tx = new TX;
 
                             if (p_tx->fill_from_strings(
-                                        rto_addr,
-                                        std::string(req_json["params"]["value"].GetString()),
-                                        std::string(req_json["params"]["fee"].GetString()),
-                                        std::string(req_json["params"]["nonce"].GetString()),
-                                        rdata,
-                                        rsign,
-                                        rpub_key))
-                            {
+                                    rto_addr,
+                                    std::string(req_json["params"]["value"].GetString()),
+                                    std::string(req_json["params"]["fee"].GetString()),
+                                    std::string(req_json["params"]["nonce"].GetString()),
+                                    rdata, rsign, rpub_key)) {
+
                                 std::string tx_hash_hex = bin2hex(p_tx->hash);
                                 counters.qps_success++;
                                 mhd_resp.data += "{\"result\":\"ok\",\"params\":\"" + tx_hash_hex + "\"" + s_id + "}";
 
-                                send_message_queue.enqueue(p_tx);
-
-                                return true;
+                                if (real_tx) {
+                                    send_message_queue.enqueue(p_tx);
+                                } else {
+                                    delete p_tx;
+                                }
                             } else {
                                 counters.qps_inv++;
                                 mhd_resp.data += "{\"result\":\"ok\",\"error\":\"Invalid transaction\"" + s_id + "}";
 
                                 delete p_tx;
-
-                                return true;
                             }
                         } else {
                             counters.qps_no_req++;
                             mhd_resp.data += "{\"result\":\"ok\",\"error\":\"no required params or bad type\"" + s_id + "}";
-                            return true;
                         }
                     } else {
                         counters.qps_inv++;
                         mhd_resp.data += "{\"result\":\"ok\",\"error\":\"unsupported params type\"" + s_id + "}";
-                        return true;
                     }
                 } else if (std::string(req_json["method"].GetString()) == "getinfo") {
                     counters.qps_trash++;
-                    mhd_resp.data += "{\"result\":{\"version\":\"" +
-                            std::to_string(VESION_MAJOR) + "." +
-                            std::to_string(VESION_MINOR) +
-                            " \"},\"error\":null" + s_id + "}";
-                    return true;
+                    mhd_resp.data += std::string("{\"result\":{")
+                        + "\"version\":\"" + std::to_string(VESION_MAJOR) + "." + std::to_string(VESION_MINOR) + "\", "
+                        + "\"mh_addr\":\"" + key_manager.Text_addres + "\"},\"error\":null" + s_id + "}";
                 } else {
                     counters.qps_inv++;
                     mhd_resp.data += "{\"result\":\"ok\",\"error\":\"unsupported method\"" + s_id + "}";
-                    return true;
                 }
             } else {
                 counters.qps_trash++;
                 mhd_resp.data += "{\"result\":\"ok\",\"error\":\"unsupported method\"" + s_id + "}";
-                return true;
             }
         } else {
             counters.qps_trash++;
             mhd_resp.data += "{\"result\":\"ok\",\"error\":\"json parse error\"}";
-            return true;
         }
     }
     return true;
@@ -186,13 +167,13 @@ bool PROXY_SERVER::init()
     return true;
 }
 
-bool KeyManager::parse(const std::string & line)
+bool KeyManager::parse(const std::string& line)
 {
 
     std::vector<unsigned char> priv_k = hex2bin(line);
     PrivKey.insert(PrivKey.end(), priv_k.begin(), priv_k.end());
     if (!generate_public_key(PubKey, PrivKey)) {
-        exit(1);
+        return false;
     }
 
     Text_PubKey = "0x" + bin2hex(PubKey);
@@ -205,7 +186,7 @@ bool KeyManager::parse(const std::string & line)
     return true;
 }
 
-std::string KeyManager::make_req_url(std::string & data)
+std::string KeyManager::make_req_url(std::string& data)
 {
     std::vector<char> sign;
     sign_data(data, sign, PrivKey);
