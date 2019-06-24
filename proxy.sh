@@ -28,7 +28,7 @@ function startProxy() {
                echo "No config file $conf found, exiting."
                           exit 2
            fi
-           echo Staring proxy
+           echo Starting proxy
            ./proxy $key $conf $port $num > $log &
         else
            echo "workdir $workdir doesn't exists"
