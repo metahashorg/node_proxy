@@ -58,7 +58,7 @@ bool PROXY_SERVER::run(int thread_number, mh::mhd::MHD::Request& mhd_req, mh::mh
                         mhd_req.params[P_PUBK])) {
                     std::string tx_hash_hex = bin2hex(p_tx->hash);
                     counters.qps_success++;
-                    mhd_resp.data += "Transaction accapted.<BR/>" + tx_hash_hex;
+                    mhd_resp.data += "Transaction accepted.<BR/>" + tx_hash_hex;
 
                     send_message_queue.enqueue(p_tx);
 
